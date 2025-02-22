@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public File Storage</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #1f1c2c, #928dab); color: white; text-align: center; padding: 50px; font-family: Arial, sans-serif; transition: 0.3s; }
+        .storage-box { max-width: 600px; margin: auto; background: rgba(0, 0, 0, 0.8); padding: 20px; border-radius: 10px; box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.2); }
+        input, select, textarea, button { margin-top: 10px; }
+        .animated-button { background: linear-gradient(45deg, #ff416c, #ff4b2b); border: none; padding: 10px 20px; font-size: 18px; border-radius: 5px; transition: 0.3s; cursor: pointer; width: 100%; }
+        .animated-button:hover { transform: scale(1.1); background: linear-gradient(45deg, #ff4b2b, #ff416c); }
+        #preview { max-width: 100px; display: none; border-radius: 5px; margin-top: 10px; }
+        .progress { display: none; height: 5px; margin-top: 10px; }
+        .drag-area { border: 2px dashed white; padding: 20px; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        .drag-area:hover { background: rgba(255, 255, 255, 0.1); }
+        #recent-uploads { margin-top: 20px; }
+        .dark-mode { background: #222; color: #ddd; }
+    </style>
+</head>
+<body>
+
+    <button class="btn btn-secondary" id="toggle-dark">🌙 Dark Mode</button>
+
+    <div class="storage-box">
+        <h2>📂 Public File Storage</h2>
+        <input type="text" id="username" class="form-control" placeholder="Enter your name">
+        <input type="email" id="email" class="form-control" placeholder="Enter your email">
+        <select id="category" class="form-control">
+            <option value="Image">Image</option>
+            <option value="Video">Video</option>
+            <option value="Document">Document</option>
+            <option value="Other">Other</option>
+        </select>
+        <textarea id="description" class="form-control" placeholder="Enter file description"></textarea>
+        <input type="text" id="tags" class="form-control" placeholder="Enter tags (comma-separated)">
+        <select id="privacy" class="form-control">
+            <option value="Public">Public</option>
+            <option value="Private">Private</option>
+        </select>
+
+        <div class="drag-area" id="drag-area">📁 Drag & Drop File Here</div>
+        <input type="file" id="file" class="form-control">
+        <img id="preview" />
+
+        <div class="progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%;"></div>
+        </div>
+
+        <button class="animated-button" id="uploadBtn">Store File</button>
+        <p id="status"></p>
+    </div>
+
+    <div id="recent-uploads">
+        <h3>📌 Recent Uploads</h3>
+        <ul id="upload-list"></ul>
+    </div>
+
+    <script>
+        const WEBHOOK_URL = "https://discord.com/api/webhooks/1337612162679443530/CXMkDG4rSxyeYTLQNlsnN7bce5vRAVCzppM6fKJTnI_57Fn2H80dA1VuGklpskatB1Dt";  // Replace with your actual webhook URL
+        let uploadedFiles = [];
+
+        $("#toggle-dark").click(() => {
+            $("body").toggleClass("dark-mode");
+        });
+
+        $("#file").change(function() {
+            let file = this.files[0];
+            if (file && file.type.startsWith("image/")) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    $("#preview").attr("src", e.target.result).show();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        $("#drag-area").on("dragover", (e) => {
+            e.preventDefault();
+            $("#drag-area").css("background", "rgba(255,255,255,0.2)");
+        });
+
+        $("#drag-area").on("dragleave", () => {
+            $("#drag-area").css("background", "transparent");
+        });
+
+        $("#drag-area").on("drop", (e) => {
+            e.preventDefault();
+            $("#drag-area").css("background", "transparent");
+            let file = e.originalEvent.dataTransfer.files[0];
+            $("#file")[0].files = e.originalEvent.dataTransfer.files;
+            $("#preview").attr("src", URL.createObjectURL(file)).show();
+        });
+
+        $("#uploadBtn").click(async function() {
+            let username = $("#username").val().trim();
+            let email = $("#email").val().trim();
+            let category = $("#category").val();
+            let description = $("#description").val().trim();
+            let tags = $("#tags").val().trim();
+            let privacy = $("#privacy").val();
+            let file = $("#file")[0].files[0];
+
+            if (!username || !email || !file) {
+                $("#status").text("❌ Please fill all required fields.").css("color", "red");
+                return;
+            }
+
+            $(".progress").show();
+            $(".progress-bar").css("width", "50%");
+
+            let jsonPayload = {
+                username: "File Storage Bot",
+                content: `📂 **New File Uploaded**\n👤 **Username:** ${username}\n📧 **Email:** ${email}\n📌 **Category:** ${category}\n📝 **Description:** ${description}\n🏷 **Tags:** ${tags}\n🔒 **Privacy:** ${privacy}`
+            };
+
+            let filePayload = new FormData();
+            filePayload.append("payload_json", JSON.stringify(jsonPayload));
+            filePayload.append("file", file);
+
+            try {
+                let response = await fetch(WEBHOOK_URL, { method: "POST", body: filePayload });
+                if (response.ok) {
+                    $("#status").text("✅ File stored successfully!").css("color", "green");
+                    uploadedFiles.unshift(`${username}: ${file.name}`);
+                    if (uploadedFiles.length > 5) uploadedFiles.pop();
+                    $("#upload-list").html(uploadedFiles.map(f => `<li>${f}</li>`).join(""));
+                    $(".progress-bar").css("width", "100%");
+                    setTimeout(() => $(".progress").hide(), 2000);
+                } else throw new Error("Upload failed.");
+            } catch (error) {
+                $("#status").text("❌ Error storing file. Try again.").css("color", "red");
+            }
+        });
+    </script>
+
+</body>
+</html>
